@@ -1,0 +1,11 @@
+[package]
+name = "quadratic"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "halo2_hello_world"
+path = "src/lib.rs"
+
+[dependencies]
+halo2_proofs = "0.2.0"
