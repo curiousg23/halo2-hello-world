@@ -12,7 +12,7 @@ mod mul;
 use add::lib::{AddChip, AddConfig, AddInstructions};
 use mul::lib::{MulChip, MulConfig, MulInstructions};
 
-/// A variable representing a number. (Why?)
+/// A variable representing a number.
 #[derive(Clone)]
 struct Number<F: FieldExt>(AssignedCell<F, F>);
 
@@ -61,7 +61,7 @@ struct SolutionChip<F: FieldExt> {
 struct SolutionConfig {
     /// One column for the instruction.
     advice: Column<Advice>,
-    // TODO: Should we be able to collapse this into one instance column?
+    // TODO: Collapse this into one instance column?
     /// The value a.
     a: Column<Instance>,
     /// The value b.
