@@ -61,15 +61,11 @@ struct SolutionChip<F: FieldExt> {
 struct SolutionConfig {
     /// One column for the instruction.
     advice: Column<Advice>,
-    // TODO: Collapse this into one instance column?
-    /// The value a.
-    a: Column<Instance>,
-    /// The value b.
-    b: Column<Instance>,
-    /// The value c.
-    c: Column<Instance>,
-
+    /// One column for the instance variables (a, b, c).
+    instance: Column<Instance>,
+    /// Config for the `Add` chip.
     add_config: AddConfig,
+    /// Config for the `Mul` chip.
     mul_config: MulConfig,
 }
 
@@ -127,23 +123,17 @@ impl<F: FieldExt> SolutionChip<F> {
     fn configure(
         meta: &mut ConstraintSystem<F>,
         advice: Column<Advice>,
-        a: Column<Instance>,
-        b: Column<Instance>,
-        c: Column<Instance>,
+        instance: Column<Instance>,
     ) -> <Self as Chip<F>>::Config {
         let add_config = AddChip::configure(meta, advice);
         let mul_config = MulChip::configure(meta, advice);
-        meta.enable_equality(a);
-        meta.enable_equality(b);
-        meta.enable_equality(c);
+        meta.enable_equality(instance);
 
         SolutionConfig {
             add_config,
             mul_config,
             advice,
-            a,
-            b,
-            c,
+            instance,
         }
     }
 }
@@ -178,13 +168,13 @@ impl<F: FieldExt> SolutionInstructions<F> for SolutionChip<F> {
             || "load constants",
             |mut region| {
                 let a = region
-                    .assign_advice_from_instance(|| "a", config.a, 0, config.advice, 0)
+                    .assign_advice_from_instance(|| "a", config.instance, 0, config.advice, 0)
                     .map(Number)?;
                 let b = region
-                    .assign_advice_from_instance(|| "b", config.b, 0, config.advice, 1)
+                    .assign_advice_from_instance(|| "b", config.instance, 1, config.advice, 1)
                     .map(Number)?;
                 let c = region
-                    .assign_advice_from_instance(|| "c", config.c, 0, config.advice, 2)
+                    .assign_advice_from_instance(|| "c", config.instance, 2, config.advice, 2)
                     .map(Number)?;
 
                 return Ok([a, b, c]);
@@ -200,7 +190,7 @@ impl<F: FieldExt> SolutionInstructions<F> for SolutionChip<F> {
     ) -> Result<(), Error> {
         let config = self.config();
 
-        layouter.constrain_instance(num.0.cell(), config.c, row)
+        layouter.constrain_instance(num.0.cell(), config.instance, row)
     }
 
     fn solve_quadratic(
@@ -234,12 +224,9 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F> {
 
     fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
         let advice = meta.advice_column();
+        let instance = meta.instance_column();
 
-        let a = meta.instance_column();
-        let b = meta.instance_column();
-        let c = meta.instance_column();
-
-        SolutionChip::configure(meta, advice, a, b, c)
+        SolutionChip::configure(meta, advice, instance)
     }
 
     fn synthesize(
@@ -254,7 +241,7 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F> {
 
         let solution = solution_chip.solve_quadratic(&mut layouter, a, b, c, x)?;
 
-        solution_chip.expose_public(layouter.namespace(|| "expose solution"), solution, 0)
+        solution_chip.expose_public(layouter.namespace(|| "expose solution"), solution, 2)
     }
 }
 
@@ -271,11 +258,9 @@ mod tests {
         let c = Fp::from(3);
         let x = Fp::from(1);
 
-        let circuit = MyCircuit {
-            x: Value::known(x),
-        };
+        let circuit = MyCircuit { x: Value::known(x) };
 
-        let prover = MockProver::run(k, &circuit, vec![vec![a], vec![b], vec![c]]).unwrap();
+        let prover = MockProver::run(k, &circuit, vec![vec![a, b, c]]).unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 
@@ -287,11 +272,9 @@ mod tests {
         let c = Fp::from(3);
         let x = Fp::from(1);
 
-        let circuit = MyCircuit {
-            x: Value::known(x),
-        };
+        let circuit = MyCircuit { x: Value::known(x) };
 
-        let prover = MockProver::run(k, &circuit, vec![vec![a], vec![b], vec![c]]).unwrap();
+        let prover = MockProver::run(k, &circuit, vec![vec![a, b, c]]).unwrap();
         assert!(prover.verify().is_err());
     }
 }
